@@ -3,12 +3,13 @@
 #define L_DIR_PIN  7
 #define L_STEP_PIN 6
 
-#define DELAY 500
+#define DELAY 1000
 #define STEP_COUNT 1000
 
 int nstep = 0;
 int dir_multi = 1;
 char serIn;
+bool move = false;
 
 void setup() {
 
@@ -27,34 +28,38 @@ void setup() {
 
 void loop() {
 
-  if( Serial.available() > ) {
+
+  move = false;
+
+  if( Serial.available() > 0 ) {
     serIn = Serial.read();
+    
+    if( serIn == 'W' ) {
+      digitalWrite(R_DIR_PIN, HIGH);
+      digitalWrite(L_DIR_PIN, HIGH);
+      move = true;
+    } else if( serIn == 'S' ) {
+      digitalWrite(R_DIR_PIN, LOW);
+      digitalWrite(L_DIR_PIN, LOW);
+      move = true;
+    } else if( serIn == 'A' ) {
+      digitalWrite(R_DIR_PIN, HIGH);
+      digitalWrite(L_DIR_PIN, LOW);
+      move = true;
+    } else if( serIn == 'D' ) {
+      digitalWrite(R_DIR_PIN, LOW);
+      digitalWrite(L_DIR_PIN, HIGH);
+      move = true;
+    }
   }
-
-  digitalWrite(R_DIR_PIN, HIGH);
-  digitalWrite(L_DIR_PIN, HIGH);
-  dir_multi = -1;
-  
-  for( int i = 0; i < STEP_COUNT; i++ ) {
-    digitalWrite(R_STEP_PIN,HIGH);
-    digitalWrite(L_STEP_PIN,HIGH);
-    delayMicroseconds(DELAY);
-    digitalWrite(R_STEP_PIN,LOW);
-    digitalWrite(L_STEP_PIN,LOW);
-    nstep += dir_multi;
+  if ( move ) {
+    for(int i = 0; i < 50; i++ ){
+      digitalWrite(R_STEP_PIN,HIGH);
+      digitalWrite(L_STEP_PIN,HIGH);
+      delayMicroseconds(DELAY);
+      digitalWrite(R_STEP_PIN,LOW);
+      digitalWrite(L_STEP_PIN,LOW);
+    }
+    
   }
-
-  digitalWrite(R_DIR_PIN, HIGH);
-  digitalWrite(L_DIR_PIN, HIGH);
-  dir_multi = -1;
-  
-  for( int i = 0; i < STEP_COUNT; i++ ) {
-    digitalWrite(R_STEP_PIN,HIGH);
-    digitalWrite(L_STEP_PIN,HIGH);
-    delayMicroseconds(DELAY);
-    digitalWrite(R_STEP_PIN,LOW);
-    digitalWrite(L_STEP_PIN,LOW);
-    nstep += dir_multi;
-  }
-  
 }
