@@ -35,6 +35,8 @@
 volatile double left_x = 0;
 volatile double left_y = 0;
 
+ros::NodeHandle nh;
+
 void joy_Callback( const sensor_msgs::Joy& joy ) {
 
   left_x = joy.axes[AXES_LEFT_JOY_LR];
@@ -46,6 +48,8 @@ void joy_Callback( const sensor_msgs::Joy& joy ) {
     left_y = 0;
   }
 }
+
+ros::Subscriber<sensor_msgs::Joy> joy_sub("/joy", &joy_Callback);
 
 int nstep = 0;
 int dir_multi = 1;
@@ -65,17 +69,22 @@ void setup() {
   digitalWrite(R_STEP_PIN, LOW);
   digitalWrite(L_DIR_PIN,  LOW);
   digitalWrite(L_STEP_PIN, LOW);
+
+  nh.initNode();
+  nh.subscribe(joy_sub);
 }
 
 void loop() {
 
+  nh.spinOnce();
+
   move = false;
 
-  if( left_x > 0 ) {
+  if( left_y > 0 ) {
     digitalWrite(R_DIR_PIN, HIGH);
     digitalWrite(L_DIR_PIN, HIGH);
     move = true;
-  } else if( left_x < 0 ) {
+  } else if( left_y < 0 ) {
     digitalWrite(R_DIR_PIN, LOW);
     digitalWrite(L_DIR_PIN, LOW);
     move = true;
