@@ -1,0 +1,16 @@
+<?xml version="1.0" ?>
+
+<launch>
+
+  <!-- Start rosserial interface for arduino -->
+  <node name="arduino_serial" pkg="rosserial_python" type="serial_node.py" output="screen">
+    <param name="port" value="/dev/ttyACM0"/>
+    <param name="baud" value="115200"/>
+  </node>
+
+   <!-- Start joystick node -->
+  <node name="joystick" pkg="joy" type="joy_node" output="screen">
+    <param name="dev"    value="/dev/input/js0"/>
+  </node>
+
+</launch>

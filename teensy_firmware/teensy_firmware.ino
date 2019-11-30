@@ -29,11 +29,26 @@
 
 #define MAGNITUDE_DEADZONE 0.1
 
+#define MIN_STEP_DELAY_US 500
+#define MAX_STEP_DELAY_US 2000
+#define DIFF_STEP_DELAY_US MIN_STEP_DELAY_US - MAX_STEP_DELAY_US
+
 #include <ros.h>
 #include <sensor_msgs/Joy.h>
 
 volatile double left_x = 0;
 volatile double left_y = 0;
+volatile double left_delay  = MAX_STEP_DELAY_US;
+volatile double right_delay = MAX_STEP_DELAY_US; 
+
+int nstep = 0;
+int dir_multi = 1;
+char serIn;
+bool move = false;
+
+IntervalTimer left_motor;
+IntervalTimer right_motor;
+
 
 ros::NodeHandle nh;
 
@@ -43,6 +58,20 @@ void joy_Callback( const sensor_msgs::Joy& joy ) {
   left_y = joy.axes[AXES_LEFT_JOY_UD];
 
   double magnitude = sqrt(pow(left_x,2) + pow(left_y,2));
+
+  double vel = DIFF_STEP_DELAY_US*abs(left_y) + MAX_STEP_DELAY_US;
+
+  double differential = vel*left_x;
+
+  int left_vel = (int)vel + (int)differential;
+  int right_vel = (int)vel - (int)differential;
+
+  if( left_vel < MIN_STEP_DELAY_US ) left_vel = MIN_STEP_DELAY_US;
+  if( right_vel < MIN_STEP_DELAY_US ) right_vel = MIN_STEP_DELAY_US;
+  
+  left_motor.update(left_vel);
+  right_motor.update(right_vel);
+  
   if( magnitude < MAGNITUDE_DEADZONE ) {
     left_x = 0;
     left_y = 0;
@@ -51,10 +80,24 @@ void joy_Callback( const sensor_msgs::Joy& joy ) {
 
 ros::Subscriber<sensor_msgs::Joy> joy_sub("/joy", &joy_Callback);
 
-int nstep = 0;
-int dir_multi = 1;
-char serIn;
-bool move = false;
+
+void left_motor_Interrupt() {
+  static bool state = false;
+  if( move ) {
+    if( state ) digitalWrite(L_STEP_PIN,HIGH);
+    else        digitalWrite(L_STEP_PIN,LOW);
+    state = !state;
+  }
+}
+
+void right_motor_Interrupt() {
+  static bool state = false;
+  if( move ) {
+    if( state ) digitalWrite(R_STEP_PIN,HIGH);
+    else        digitalWrite(R_STEP_PIN,LOW);
+    state = !state;
+  }
+}
 
 void setup() {
 
@@ -72,11 +115,16 @@ void setup() {
 
   nh.initNode();
   nh.subscribe(joy_sub);
+
+  left_motor.begin(left_motor_Interrupt, MAX_STEP_DELAY_US);
+  right_motor.begin(right_motor_Interrupt, MAX_STEP_DELAY_US);
 }
 
 void loop() {
 
   nh.spinOnce();
+
+  noInterrupts();
 
   move = false;
 
@@ -90,14 +138,5 @@ void loop() {
     move = true;
   }
 
-  if ( move ) {
-    for(int i = 0; i < 50; i++ ){
-      digitalWrite(R_STEP_PIN,HIGH);
-      digitalWrite(L_STEP_PIN,HIGH);
-      delayMicroseconds(DELAY);
-      digitalWrite(R_STEP_PIN,LOW);
-      digitalWrite(L_STEP_PIN,LOW);
-    }
-    
-  }
+  interrupts();   
 }
