@@ -1,0 +1,92 @@
+# Modified Makefile for compiling and loading Teensyduino programs from
+# the command line. Based on the Makefile supplied as part of Teensyduino.
+#
+# For Teensy 3.1 only. Be sure to set ARDUINOPATH below to point to your 
+# Teensyduino installation folder.
+
+# The name of your project (used to name the compiled .hex file)
+TARGET = main
+
+# Path to your arduino/teensyduino installation
+ARDUINOPATH = /home/odroid/arduino-1.8.10
+
+# configurable options
+OPTIONS = -DF_CPU=48000000 -DUSB_SERIAL -DLAYOUT_US_ENGLISH -DUSING_MAKEFILE
+
+# options needed by many Arduino libraries to configure for Teensy 3.0
+OPTIONS += -D__MK64FX512__ -DARDUINO=10600 -DTEENSYDUINO=121 -mfloat-abi=hard -mfpu=fpv4-sp-d16
+
+# Other Makefiles and project templates for Teensy 3.x:
+#
+# https://github.com/apmorton/teensy-template
+# https://github.com/xxxajk/Arduino_Makefile_master
+# https://github.com/JonHylands/uCee
+
+#************************************************************************
+# Location of Teensyduino utilities, Toolchain, and Arduino Libraries.
+# To use this makefile without Arduino, copy the resources from these
+# locations and edit the pathnames.  The rest of Arduino is not needed.
+#************************************************************************
+
+# path location for Teensy Loader, teensy_post_compile and teensy_reboot
+TOOLSPATH = $(ARDUINOPATH)/hardware/tools   # on Linux
+
+# path location for Arduino libraries (currently not used)
+LIBRARYPATH = $(ARDUINOPATH)/libraries
+
+# path location for the arm-none-eabi compiler
+COMPILERPATH = $(ARDUINOPATH)/hardware/tools/arm/bin
+
+# Base source files.
+BASE_SRC_PATH = $(ARDUINOPATH)/hardware/teensy/avr/cores/teensy3
+
+#************************************************************************
+# Settings below this point usually do not need to be edited
+#************************************************************************
+
+# CPPFLAGS = compiler options for C and C++
+CPPFLAGS = -Wall -g -Os -mcpu=cortex-m4 -mthumb -nostdlib -MMD $(OPTIONS) -I. -I$(BASE_SRC_PATH)
+
+# compiler options for C++ only
+CXXFLAGS = -std=gnu++0x -felide-constructors -fno-exceptions -fno-rtti
+
+# compiler options for C only
+CFLAGS =
+
+# linker options
+LDSCRIPT = $(BASE_SRC_PATH)/mk64fx512.ld
+LDFLAGS = -Os -Wl,--gc-sections,--defsym=__rtc_localtime=0 --specs=nano.specs -mcpu=cortex-m4 -mthumb -T$(BASE_SRC_PATH)/mk20dx256.ld
+LDFLAGS += -mfloat-abi=hard -mfpu=fpv4-sp-d16 -T$(LDSCRIPT)
+# additional libraries to link
+LIBS = -larm_cortexM4lf_math
+
+# names for the compiler programs
+CC = $(abspath $(COMPILERPATH))/arm-none-eabi-gcc
+CXX = $(abspath $(COMPILERPATH))/arm-none-eabi-g++
+OBJCOPY = $(abspath $(COMPILERPATH))/arm-none-eabi-objcopy
+SIZE = $(abspath $(COMPILERPATH))/arm-none-eabi-size
+
+# automatically create lists of the sources and objects
+# TODO: this does not handle Arduino libraries yet...
+C_FILES := $(wildcard $(BASE_SRC_PATH)/*.c *.c)
+CPP_FILES := $(filter-out $(BASE_SRC_PATH)/main.cpp, $(wildcard $(BASE_SRC_PATH)/*.cpp *.cpp))
+OBJS := $(C_FILES:.c=.o) $(CPP_FILES:.cpp=.o)
+
+# the actual makefile rules (all .o files built by GNU make's default implicit rules)
+
+all: $(TARGET).hex
+
+$(TARGET).elf: $(OBJS) $(BASE_SRC_PATH)/mk20dx256.ld
+	$(CC) $(LDFLAGS) -o $@ $(OBJS) $(LIBS)
+
+%.hex: %.elf
+	$(SIZE) $<
+	$(OBJCOPY) -O ihex -R .eeprom $< $@
+	$(abspath $(TOOLSPATH))/teensy_post_compile -file=$(basename $@) -path=$(shell pwd) -tools=$(abspath $(TOOLSPATH))
+	-$(abspath $(TOOLSPATH))/teensy_reboot
+
+# compiler generated dependency info
+-include $(OBJS:.o=.d)
+
+clean:
+	rm -f *.o *.d $(TARGET).elf $(TARGET).hex
